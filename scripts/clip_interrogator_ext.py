@@ -25,8 +25,8 @@ def load(clip_model_name):
                 print(f"    detected < 12GB VRAM, using low VRAM mode")
 
         config = Config(device=devices.get_optimal_device(), clip_model_name=clip_model_name)
+        config.cache_path = 'models/clip-interrogator'
         if low_vram:
-            config.cache_path = 'models/clip-interrogator'
             config.blip_model_type = 'base'
             config.blip_offload = True
             config.chunk_size = 1024
