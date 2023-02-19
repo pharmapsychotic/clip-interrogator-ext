@@ -7,7 +7,7 @@ from clip_interrogator import Config, Interrogator
 
 from modules import devices, script_callbacks, shared, lowvram
 
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
 ci = None
 
@@ -26,6 +26,7 @@ def load(clip_model_name):
 
         config = Config(device=devices.get_optimal_device(), clip_model_name=clip_model_name)
         if low_vram:
+            config.cache_path = 'models/clip-interrogator'
             config.blip_model_type = 'base'
             config.blip_offload = True
             config.chunk_size = 1024
@@ -69,17 +70,35 @@ def image_analysis(image, clip_model_name):
     return medium_ranks, artist_ranks, movement_ranks, trending_ranks, flavor_ranks
 
 def image_to_prompt(image, mode, clip_model_name):
-    load(clip_model_name)
+    shared.state.begin()
+    shared.state.job = 'interrogate'
 
-    image = image.convert('RGB')
-    if mode == 'best':
-        return ci.interrogate(image)
-    elif mode == 'classic':
-        return ci.interrogate_classic(image)
-    elif mode == 'fast':
-        return ci.interrogate_fast(image)
-    elif mode == 'negative':
-        return ci.interrogate_negative(image)
+    try: 
+        if shared.cmd_opts.lowvram or shared.cmd_opts.medvram:
+            lowvram.send_everything_to_cpu()
+            devices.torch_gc()
+
+        load(clip_model_name)
+
+        image = image.convert('RGB')
+
+        if mode == 'best':
+            prompt = ci.interrogate(image)
+        elif mode == 'classic':
+            prompt = ci.interrogate_classic(image)
+        elif mode == 'fast':
+            prompt = ci.interrogate_fast(image)
+        elif mode == 'negative':
+            prompt = ci.interrogate_negative(image)
+    except torch.cuda.OutOfMemoryError as e:
+        prompt = "Ran out of VRAM"
+        print(e)
+    except RuntimeError as e:
+        prompt = f"Exception {type(e)}"
+        print(e)
+
+    shared.state.end()
+    return prompt
 
 def prompt_tab():
     with gr.Column():
