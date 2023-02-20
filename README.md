@@ -13,4 +13,4 @@ This extension adds a tab for [CLIP Interrogator](https://github.com/pharmapsych
 * Click "Install from URL" sub tab
 * Paste `https://github.com/pharmapsychotic/clip-interrogator-ext` and click Install
 * Check in your terminal window if there are any errors (if so let me know!)
-* Restart the Web UI and you should see a new **Interrogate** tab
+* Restart the Web UI and you should see a new **Interrogator** tab

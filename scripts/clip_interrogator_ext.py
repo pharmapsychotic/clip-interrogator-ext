@@ -7,7 +7,7 @@ from clip_interrogator import Config, Interrogator
 
 from modules import devices, script_callbacks, shared, lowvram
 
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 ci = None
 
@@ -19,24 +19,19 @@ def load(clip_model_name):
         low_vram = shared.cmd_opts.lowvram or shared.cmd_opts.medvram
         if not low_vram and torch.cuda.is_available():
             device = devices.get_optimal_device()
-            vram_total_mb = torch.cuda.get_device_properties(device).total_memory / (1024**2)
-            if vram_total_mb < 12*1024*1024:
+            vram_total = torch.cuda.get_device_properties(device).total_memory
+            if vram_total < 12*1024*1024*1024:
                 low_vram = True
                 print(f"    detected < 12GB VRAM, using low VRAM mode")
 
         config = Config(device=devices.get_optimal_device(), clip_model_name=clip_model_name)
         config.cache_path = 'models/clip-interrogator'
         if low_vram:
-            config.blip_model_type = 'base'
-            config.blip_offload = True
-            config.chunk_size = 1024
-            config.flavor_intermediate_count = 1024
+            config.apply_low_vram_defaults()
         ci = Interrogator(config)
     if clip_model_name != ci.config.clip_model_name:
         ci.config.clip_model_name = clip_model_name
         ci.load_clip_model()
-    ci.blip_model = ci.blip_model.to(devices.get_optimal_device())
-    ci.clip_model = ci.clip_model.to(devices.get_optimal_device())
 
 def unload():
     global ci
@@ -44,6 +39,8 @@ def unload():
         print("Offloading CLIP Interrogator...")
         ci.blip_model = ci.blip_model.to(devices.cpu)
         ci.clip_model = ci.clip_model.to(devices.cpu)
+        ci.blip_offloaded = True
+        ci.clip_offloaded = True
         devices.torch_gc()
 
 def get_models():
