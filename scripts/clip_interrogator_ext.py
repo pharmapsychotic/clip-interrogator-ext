@@ -11,7 +11,7 @@ from clip_interrogator import Config, Interrogator
 
 from modules import devices, lowvram, script_callbacks, shared
 
-__version__ = '0.0.7'
+__version__ = '0.0.8'
 
 ci = None
 
@@ -251,7 +251,7 @@ def prompt_tab():
             with gr.Column():
                 mode = gr.Radio(['best', 'fast', 'classic', 'negative'], label='Mode', value='best')
                 model = gr.Dropdown(get_models(), value='ViT-L-14/openai', label='CLIP Model')
-        prompt = gr.Textbox(label="Prompt")
+        prompt = gr.Textbox(label="Prompt", lines=3)
     with gr.Row():
         button = gr.Button("Generate", variant='primary')
         unload_button = gr.Button("Unload")
