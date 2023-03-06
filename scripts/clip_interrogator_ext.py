@@ -203,7 +203,7 @@ def batch_tab():
             for file in files:
                 if shared.state.interrupted:
                     break
-                image = Image.open(os.path.join(folder, file))
+                image = Image.open(os.path.join(folder, file)).convert('RGB')
                 captions.append(ci.generate_caption(image))
                 shared.total_tqdm.update()
 
@@ -214,7 +214,7 @@ def batch_tab():
             for idx, file in enumerate(files):
                 if shared.state.interrupted:
                     break
-                image = Image.open(os.path.join(folder, file))
+                image = Image.open(os.path.join(folder, file)).convert('RGB')
                 prompt = interrogate(image, mode, caption=captions[idx])
                 writer.add(file, prompt)
                 shared.total_tqdm.update()
