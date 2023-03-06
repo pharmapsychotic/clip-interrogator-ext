@@ -11,7 +11,7 @@ from clip_interrogator import Config, Interrogator
 
 from modules import devices, lowvram, script_callbacks, shared
 
-__version__ = '0.0.8'
+__version__ = '0.0.9'
 
 ci = None
 
