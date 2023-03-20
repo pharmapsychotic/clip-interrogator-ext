@@ -1,6 +1,6 @@
 import launch
 
-CI_VERSION = "0.5.4"
+CI_VERSION = "0.6.0"
 needs_install = False
 
 try:
