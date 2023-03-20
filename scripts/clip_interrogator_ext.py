@@ -11,7 +11,7 @@ from clip_interrogator import Config, Interrogator, list_caption_models, list_cl
 
 from modules import devices, lowvram, script_callbacks, shared
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 ci = None
 low_vram = False
@@ -56,14 +56,15 @@ def load(clip_model_name, caption_model_name):
         print(f"Loading CLIP Interrogator {clip_interrogator.__version__}...")
         config = Config(
             device=devices.get_optimal_device(), 
-            clip_model_name=clip_model_name, 
-            caption_model_name=caption_model_name
+            clip_model_name=clip_model_name
         )
+        if caption_model_name:
+            config.caption_model_name = caption_model_name
         config.cache_path = 'models/clip-interrogator'
         if low_vram:
             config.apply_low_vram_defaults()
         ci = Interrogator(config)
-    if caption_model_name != ci.config.caption_model_name:
+    if caption_model_name and caption_model_name != ci.config.caption_model_name:
         ci.config.caption_model_name = caption_model_name
         ci.load_caption_model()
     if clip_model_name != ci.config.clip_model_name:
@@ -81,7 +82,7 @@ def unload():
         devices.torch_gc()
 
 def image_analysis(image, clip_model_name):
-    load(clip_model_name)
+    load(clip_model_name, None)
 
     image = image.convert('RGB')
     image_features = ci.image_to_features(image)
