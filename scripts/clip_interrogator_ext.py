@@ -11,7 +11,7 @@ from clip_interrogator import Config, Interrogator, list_caption_models, list_cl
 
 from modules import devices, lowvram, script_callbacks, shared
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 ci = None
 low_vram = False
@@ -56,11 +56,11 @@ def load(clip_model_name, caption_model_name):
         print(f"Loading CLIP Interrogator {clip_interrogator.__version__}...")
         config = Config(
             device=devices.get_optimal_device(), 
+            cache_path = 'models/clip-interrogator',
             clip_model_name=clip_model_name
         )
         if caption_model_name:
             config.caption_model_name = caption_model_name
-        config.cache_path = 'models/clip-interrogator'
         if low_vram:
             config.apply_low_vram_defaults()
         ci = Interrogator(config)
@@ -162,7 +162,10 @@ def about_tab():
     if torch.cuda.is_available():
         device = devices.get_optimal_device()
         vram_total_mb = torch.cuda.get_device_properties(device).total_memory / (1024**2)
-        gr.Markdown(f"GPU VRAM: {vram_total_mb:.2f}MB")
+        vram_info = f"GPU VRAM: **{vram_total_mb:.2f}MB**"
+        if low_vram:
+            vram_info += "<br>Using low VRAM configuration"
+        gr.Markdown(vram_info)
 
 def analyze_tab():
     with gr.Column():
@@ -272,9 +275,8 @@ def add_tab():
     if not low_vram and torch.cuda.is_available():
         device = devices.get_optimal_device()
         vram_total = torch.cuda.get_device_properties(device).total_memory
-        if vram_total < 12*1024*1024*1024:
+        if vram_total < 11*1024*1024*1024:
             low_vram = True
-            print(f"    detected < 12GB VRAM, using low VRAM mode")
 
     with gr.Blocks(analytics_enabled=False) as ui:
         with gr.Tab("Prompt"):
