@@ -11,7 +11,7 @@ from clip_interrogator import Config, Interrogator, list_caption_models, list_cl
 
 from modules import devices, lowvram, script_callbacks, shared
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 ci = None
 low_vram = False
@@ -275,7 +275,7 @@ def add_tab():
     if not low_vram and torch.cuda.is_available():
         device = devices.get_optimal_device()
         vram_total = torch.cuda.get_device_properties(device).total_memory
-        if vram_total < 11*1024*1024*1024:
+        if vram_total <= 12*1024*1024*1024:
             low_vram = True
 
     with gr.Blocks(analytics_enabled=False) as ui:
