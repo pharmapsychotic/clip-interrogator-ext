@@ -42,7 +42,6 @@ class BatchWriter:
         elif self.mode == BATCH_OUTPUT_MODES[1]:
             self.file.write(f"{prompt}\n")
         elif self.mode == BATCH_OUTPUT_MODES[2]:
-            self.file.write(f"{file},{prompt}\n")
             self.csv.writerow([file, prompt])
 
     def close(self):
