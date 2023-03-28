@@ -7,11 +7,11 @@ import torch
 from PIL import Image
 
 import clip_interrogator
-from clip_interrogator import Config, Interrogator, list_caption_models, list_clip_models
+from clip_interrogator import Config, Interrogator
 
 from modules import devices, lowvram, script_callbacks, shared
 
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
 ci = None
 low_vram = False
@@ -49,23 +49,21 @@ class BatchWriter:
             self.file.close()
 
 
-def load(clip_model_name, caption_model_name):
+def load(clip_model_name):
     global ci
     if ci is None:
         print(f"Loading CLIP Interrogator {clip_interrogator.__version__}...")
+
         config = Config(
             device=devices.get_optimal_device(), 
             cache_path = 'models/clip-interrogator',
-            clip_model_name=clip_model_name
+            clip_model_name=clip_model_name,
+            blip_model=shared.interrogator.load_blip_model().float()
         )
-        if caption_model_name:
-            config.caption_model_name = caption_model_name
         if low_vram:
             config.apply_low_vram_defaults()
         ci = Interrogator(config)
-    if caption_model_name and caption_model_name != ci.config.caption_model_name:
-        ci.config.caption_model_name = caption_model_name
-        ci.load_caption_model()
+
     if clip_model_name != ci.config.clip_model_name:
         ci.config.clip_model_name = clip_model_name
         ci.load_clip_model()
@@ -74,14 +72,14 @@ def unload():
     global ci
     if ci is not None:
         print("Offloading CLIP Interrogator...")
-        ci.caption_model = ci.caption_model.to(devices.cpu)
+        ci.blip_model = ci.blip_model.to(devices.cpu)
         ci.clip_model = ci.clip_model.to(devices.cpu)
-        ci.caption_offloaded = True
+        ci.blip_offloaded = True
         ci.clip_offloaded = True
         devices.torch_gc()
 
 def image_analysis(image, clip_model_name):
-    load(clip_model_name, None)
+    load(clip_model_name)
 
     image = image.convert('RGB')
     image_features = ci.image_to_features(image)
@@ -115,7 +113,7 @@ def interrogate(image, mode, caption=None):
         raise Exception(f"Unknown mode {mode}")
     return prompt
 
-def image_to_prompt(image, mode, clip_model_name, caption_model_name):
+def image_to_prompt(image, mode, clip_model_name):
     shared.state.begin()
     shared.state.job = 'interrogate'
 
@@ -124,7 +122,7 @@ def image_to_prompt(image, mode, clip_model_name, caption_model_name):
             lowvram.send_everything_to_cpu()
             devices.torch_gc()
 
-        load(clip_model_name, caption_model_name)
+        load(clip_model_name)
         image = image.convert('RGB')
         prompt = interrogate(image, mode)
     except torch.cuda.OutOfMemoryError as e:
@@ -146,11 +144,6 @@ def about_tab():
         "CLIP models:\n"
         "* For best prompts with Stable Diffusion 1.* choose the **ViT-L-14/openai** model.\n"
         "* For best prompts with Stable Diffusion 2.* choose the **ViT-H-14/laion2b_s32b_b79k** model.\n"
-        "\nCaption models:\n"
-        "* blip-large is recommended. use blip-base if you have less than 8GB of VRAM.\n"
-        "* blip-base: 990MB, blip-large: 1.9GB\n"
-        "* git-large-coco: 1.58GB\n"
-        "* blip2-2.7b: 15.5GB, blip2-flan-t5-xl: 15.77GB\n"
         "\nOther:\n"
         "* When you are done click the **Unload** button to free up memory."
     )
@@ -166,11 +159,14 @@ def about_tab():
             vram_info += "<br>Using low VRAM configuration"
         gr.Markdown(vram_info)
 
+def get_models():
+    return ['/'.join(x) for x in open_clip.list_pretrained()]
+
 def analyze_tab():
     with gr.Column():
         with gr.Row():
             image = gr.Image(type='pil', label="Image")
-            model = gr.Dropdown(list_clip_models(), value='ViT-L-14/openai', label='CLIP Model')
+            model = gr.Dropdown(get_models(), value='ViT-L-14/openai', label='CLIP Model')
         with gr.Row():
             medium = gr.Label(label="Medium", num_top_classes=5)
             artist = gr.Label(label="Artist", num_top_classes=5)        
@@ -181,7 +177,7 @@ def analyze_tab():
     button.click(image_analysis, inputs=[image, model], outputs=[medium, artist, movement, trending, flavor])
 
 def batch_tab():
-    def batch_process(folder, clip_model, caption_model, mode, output_mode):
+    def batch_process(folder, clip_model, mode, output_mode):
         if not os.path.exists(folder):
             return f"Folder {folder} does not exist"
         if not os.path.isdir(folder):
@@ -199,7 +195,7 @@ def batch_tab():
                 lowvram.send_everything_to_cpu()
                 devices.torch_gc()
 
-            load(clip_model, caption_model)
+            load(clip_model)
 
             shared.total_tqdm.updateTotal(len(files))
             ci.config.quiet = True
@@ -240,8 +236,7 @@ def batch_tab():
         with gr.Row():
             folder = gr.Text(label="Images folder", value="", interactive=True)
         with gr.Row():
-            clip_model = gr.Dropdown(list_clip_models(), value='ViT-L-14/openai', label='CLIP Model')
-            caption_model = gr.Dropdown(list_caption_models(), value='blip-base' if low_vram else 'blip-large', label='Caption Model')
+            clip_model = gr.Dropdown(get_models(), value='ViT-L-14/openai', label='CLIP Model')
             mode = gr.Radio(['caption', 'best', 'fast', 'classic', 'negative'], label='Prompt Mode', value='fast')
             output_mode = gr.Dropdown(BATCH_OUTPUT_MODES, value=BATCH_OUTPUT_MODES[0], label='Output Mode')
         with gr.Row():        
@@ -249,7 +244,7 @@ def batch_tab():
             interrupt = gr.Button('Interrupt', visible=True)
             interrupt.click(fn=lambda: shared.state.interrupt(), inputs=[], outputs=[])
 
-    button.click(batch_process, inputs=[folder, clip_model, caption_model, mode, output_mode], outputs=[])
+    button.click(batch_process, inputs=[folder, clip_model, mode, output_mode], outputs=[])
 
 def prompt_tab():
     with gr.Column():
@@ -257,14 +252,12 @@ def prompt_tab():
             image = gr.Image(type='pil', label="Image")
             with gr.Column():
                 mode = gr.Radio(['best', 'fast', 'classic', 'negative'], label='Mode', value='best')
-                clip_model = gr.Dropdown(list_clip_models(), value='ViT-L-14/openai', label='CLIP Model')
-                caption_model = gr.Dropdown(list_caption_models(), value='blip-base' if low_vram else 'blip-large', label='Caption Model')
-                list_caption_models
+                clip_model = gr.Dropdown(get_models(), value='ViT-L-14/openai', label='CLIP Model')
         prompt = gr.Textbox(label="Prompt", lines=3)
     with gr.Row():
         button = gr.Button("Generate", variant='primary')
         unload_button = gr.Button("Unload")
-    button.click(image_to_prompt, inputs=[image, mode, clip_model, caption_model], outputs=prompt)
+    button.click(image_to_prompt, inputs=[image, mode, clip_model], outputs=prompt)
     unload_button.click(unload)
 
 
