@@ -210,7 +210,6 @@ def batch_tab():
                         break
                     image = Image.open(os.path.join(folder, file)).convert('RGB')
                     captions.append(ci.generate_caption(image))
-                    shared.total_tqdm.update()
                 except OSError:
                     print(f" Could not read {file}; continuing")
                     continue
