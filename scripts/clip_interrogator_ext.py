@@ -209,11 +209,15 @@ def batch_tab():
                     if shared.state.interrupted:
                         break
                     image = Image.open(os.path.join(folder, file)).convert('RGB')
-                    captions.append(ci.generate_caption(image))
-                except OSError:
-                    print(f" Could not read {file}; continuing")
+                    caption = ci.generate_caption(image)
+                    shared.total_tqdm.update()
+                except OSError as e:
+                    print(f"{e}; continuing")
+                    # https://github.com/pharmapsychotic/clip-interrogator-ext/pull/49#pullrequestreview-1454127223
+                    caption = ""
                     continue
                 finally:
+                    captions.append(caption)
                     shared.total_tqdm.update()
 
             # interrogate in second pass
@@ -225,12 +229,8 @@ def batch_tab():
                     if shared.state.interrupted:
                         break
                     image = Image.open(os.path.join(folder, file)).convert('RGB')
-                    try:
-                        prompt = interrogate(image, mode, caption=captions[idx])
-                        writer.add(file, prompt)
-                    except IndexError as e:
-                        print(f" {e}, continuing")
-                        continue
+                    prompt = interrogate(image, mode, caption=captions[idx])
+                    writer.add(file, prompt)
                 except OSError as e:
                     print(f" {e}, continuing")
                     continue
