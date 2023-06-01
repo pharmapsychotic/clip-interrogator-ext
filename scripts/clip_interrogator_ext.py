@@ -210,7 +210,6 @@ def batch_tab():
                         break
                     image = Image.open(os.path.join(folder, file)).convert('RGB')
                     caption = ci.generate_caption(image)
-                    shared.total_tqdm.update()
                 except OSError as e:
                     print(f"{e}; continuing")
                     # https://github.com/pharmapsychotic/clip-interrogator-ext/pull/49#pullrequestreview-1454127223
