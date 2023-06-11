@@ -4,14 +4,14 @@ import open_clip
 import os
 import torch
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 
 import clip_interrogator
 from clip_interrogator import Config, Interrogator
 
 from modules import devices, lowvram, script_callbacks, shared
 
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 
 ci = None
 low_vram = False
@@ -180,13 +180,16 @@ def analyze_tab():
 def batch_tab():
     def batch_process(folder, clip_model, mode, output_mode):
         if not os.path.exists(folder):
-            return f"Folder {folder} does not exist"
+            print(f"Folder {folder} does not exist")
+            return
         if not os.path.isdir(folder):
-            return "{folder} is not a directory"
+            print("{folder} is not a directory")
+            return
 
         files = [f for f in os.listdir(folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
         if not files:
-            return "Folder has no images"
+            print("Folder has no images")
+            return
 
         shared.state.begin()
         shared.state.job = 'batch interrogate'
@@ -212,9 +215,7 @@ def batch_tab():
                     caption = ci.generate_caption(image)
                 except OSError as e:
                     print(f"{e}; continuing")
-                    # https://github.com/pharmapsychotic/clip-interrogator-ext/pull/49#pullrequestreview-1454127223
                     caption = ""
-                    continue
                 finally:
                     captions.append(caption)
                     shared.total_tqdm.update()
@@ -232,7 +233,6 @@ def batch_tab():
                     writer.add(file, prompt)
                 except OSError as e:
                     print(f" {e}, continuing")
-                    continue
                 finally:
                     shared.total_tqdm.update()
             writer.close()
