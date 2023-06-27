@@ -24,5 +24,5 @@ documented on the /docs page under /interrogator/* (using --api flag when starti
   * lists all available models for interrogation
 * /interrogator/prompt
   * returns a prompt for the given image, model and mode
-* /interrogator/analyse
+* /interrogator/analyze
   * returns a list of words and their scores for the given image, model

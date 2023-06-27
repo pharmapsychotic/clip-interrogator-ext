@@ -312,7 +312,7 @@ def decode_base64_to_image(encoding):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Invalid encoded image") from e
 
-class InterrogatorAnalyseRequest(BaseModel):
+class InterrogatorAnalyzeRequest(BaseModel):
     image: str = Field(
         default="",
         title="Image",
@@ -324,13 +324,12 @@ class InterrogatorAnalyseRequest(BaseModel):
         description="The interrogate model used. See the models endpoint for a list of available models.",
     )
 
-class InterrogatorPromptRequest(InterrogatorAnalyseRequest):
+class InterrogatorPromptRequest(InterrogatorAnalyzeRequest):
     mode: str = Field(
         default="fast",
         title="Mode",
         description="The mode used to generate the prompt. Can be one of: best, fast, classic, negative.",
     )
-
 
 def mount_interrogator_api(_: gr.Blocks, app: FastAPI):
     @app.get("/interrogator/models")
@@ -338,18 +337,18 @@ def mount_interrogator_api(_: gr.Blocks, app: FastAPI):
         return ["/".join(x) for x in open_clip.list_pretrained()]
 
     @app.post("/interrogator/prompt")
-    async def get_prompt(analysereq: InterrogatorPromptRequest):
-        image_b64 = analysereq.image
+    async def get_prompt(analyzereq: InterrogatorPromptRequest):
+        image_b64 = analyzereq.image
         if image_b64 is None:
             raise HTTPException(status_code=404, detail="Image not found")
 
         img = decode_base64_to_image(image_b64)
-        prompt = image_to_prompt(img, analysereq.mode, analysereq.clip_model_name)
+        prompt = image_to_prompt(img, analyzereq.mode, analyzereq.clip_model_name)
         return {"prompt": prompt}
 
-    @app.post("/interrogator/analyse")
-    async def analyse(analysereq: InterrogatorAnalyseRequest):
-        image_b64 = analysereq.image
+    @app.post("/interrogator/analyze")
+    async def analyze(analyzereq: InterrogatorAnalyzeRequest):
+        image_b64 = analyzereq.image
         if image_b64 is None:
             raise HTTPException(status_code=404, detail="Image not found")
 
@@ -360,7 +359,7 @@ def mount_interrogator_api(_: gr.Blocks, app: FastAPI):
             movement_ranks,
             trending_ranks,
             flavor_ranks,
-        ) = image_analysis(img, analysereq.clip_model_name)
+        ) = image_analysis(img, analyzereq.clip_model_name)
         return {
             "medium": medium_ranks,
             "artist": artist_ranks,
