@@ -347,8 +347,8 @@ def mount_interrogator_api(_: gr.Blocks, app: FastAPI):
         prompt = image_to_prompt(img, analysereq.mode, analysereq.clip_model_name)
         return {"prompt": prompt}
 
-    @app.post("/interrogator/analyze")
-    async def analyze(analysereq: InterrogatorAnalyseRequest):
+    @app.post("/interrogator/analyse")
+    async def analyse(analysereq: InterrogatorAnalyseRequest):
         image_b64 = analysereq.image
         if image_b64 is None:
             raise HTTPException(status_code=404, detail="Image not found")
