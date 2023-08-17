@@ -150,6 +150,7 @@ def about_tab():
         "CLIP models:\n"
         "* For best prompts with Stable Diffusion 1.* choose the **ViT-L-14/openai** model.\n"
         "* For best prompts with Stable Diffusion 2.* choose the **ViT-H-14/laion2b_s32b_b79k** model.\n"
+        "* For best prompts with Stable Diffusion XL choose **ViT-L-14/openai** or **ViT-bigG-14/laion2b_s39b** model.\n"
         "\nOther:\n"
         "* When you are done click the **Unload** button to free up memory."
     )
