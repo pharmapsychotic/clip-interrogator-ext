@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
 from io import BytesIO
 
-__version__ = "0.1.6"
+__version__ = "0.2.0"
 
 ci = None
 low_vram = False
@@ -64,7 +64,6 @@ def load(clip_model_name):
             device=devices.get_optimal_device(),
             cache_path = 'models/clip-interrogator',
             clip_model_name=clip_model_name,
-            blip_model=shared.interrogator.load_blip_model().float()
         )
         if low_vram:
             config.apply_low_vram_defaults()
@@ -78,10 +77,10 @@ def unload():
     global ci
     if ci is not None:
         print("Offloading CLIP Interrogator...")
-        ci.blip_model = ci.blip_model.to(devices.cpu)
+        ci.caption_model = ci.caption_model.to(devices.cpu)
         ci.clip_model = ci.clip_model.to(devices.cpu)
-        ci.blip_offloaded = True
-        ci.clip_offloaded = True
+        ci.caption_offload = True
+        ci.clip_offload = True
         devices.torch_gc()
 
 def image_analysis(image, clip_model_name):
