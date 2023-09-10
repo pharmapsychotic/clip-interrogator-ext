@@ -10,6 +10,7 @@ from PIL import Image
 import clip_interrogator
 from clip_interrogator import Config, Interrogator
 
+import modules.generation_parameters_copypaste as parameters_copypaste
 from modules import devices, lowvram, script_callbacks, shared
 
 from pydantic import BaseModel, Field
@@ -17,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
 from io import BytesIO
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 ci = None
 low_vram = False
@@ -277,8 +278,13 @@ def prompt_tab():
     with gr.Row():
         button = gr.Button("Generate", variant='primary')
         unload_button = gr.Button("Unload")
+    with gr.Row():
+        buttons = parameters_copypaste.create_buttons(["txt2img", "img2img", "inpaint", "extras"])
     button.click(image_to_prompt, inputs=[image, mode, clip_model], outputs=prompt)
     unload_button.click(unload)
+
+    for tabname, button in buttons.items():
+        parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(paste_button=button, tabname=tabname, source_text_component=prompt, source_image_component=image,))
 
 
 def add_tab():
