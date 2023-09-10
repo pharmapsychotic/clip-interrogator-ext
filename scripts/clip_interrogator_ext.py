@@ -79,8 +79,8 @@ def unload():
         print("Offloading CLIP Interrogator...")
         ci.caption_model = ci.caption_model.to(devices.cpu)
         ci.clip_model = ci.clip_model.to(devices.cpu)
-        ci.caption_offload = True
-        ci.clip_offload = True
+        ci.caption_offloaded = True
+        ci.clip_offloaded = True
         devices.torch_gc()
 
 def image_analysis(image, clip_model_name):
