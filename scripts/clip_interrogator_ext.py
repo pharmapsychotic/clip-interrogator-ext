@@ -14,6 +14,7 @@ import modules.generation_parameters_copypaste as parameters_copypaste
 from modules import devices, lowvram, script_callbacks, shared
 
 from pydantic import BaseModel, Field
+from typing import List
 from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
 from io import BytesIO
@@ -141,7 +142,7 @@ def image_to_prompt(image, mode, clip_model_name):
     shared.state.end()
     return prompt
 
-def image_to_prompt_custom(image, listfile, clip_model_name):
+def image_to_prompt_custom(image, listfile, listarray, desc, clip_model_name):
     shared.state.begin()
     shared.state.job = 'interrogate_custom'
 
@@ -152,7 +153,22 @@ def image_to_prompt_custom(image, listfile, clip_model_name):
 
         load(clip_model_name)
         image = image.convert('RGB')
-        prompt = interrogate_custom(image, listfile)
+        if listfile:
+            if not os.path.exists(listfile):
+                prompt = f"File {listfile} does not exist"
+                print(prompt)
+            else:
+                terms = load_list(listfile)
+                prompt = interrogate_custom(image, terms, desc)
+        elif listarray:
+            if type(listarray) is not list:
+                prompt = f"Listarray is not a list"
+                print(prompt)
+            else:
+                prompt = interrogate_custom(image, listarray, desc)
+        else:
+            prompt = f"Listfile or Listarray not defined"
+            print(prompt)
     except torch.cuda.OutOfMemoryError as e:
         prompt = "Ran out of VRAM"
         print(e)
@@ -163,22 +179,11 @@ def image_to_prompt_custom(image, listfile, clip_model_name):
     shared.state.end()
     return prompt
 
-def interrogate_custom(image, listfile):
-    prompt = ""
-    if listfile is None:
-        return prompt
-
-    if not os.path.exists(listfile):
-        print(f"File {listfile} does not exist")
-        return prompt
-    if not os.path.isfile(listfile):
-        print(f"{listfile} is not a file")
-        return prompt
-
-    table = LabelTable(load_list(listfile), 'terms', ci)
+def interrogate_custom(image, terms, desc="custom"):
+    table = LabelTable(terms, desc, ci)
     best_matches = table.rank(ci.image_to_features(image), top_count=1)
     prompt = best_matches[0]
-    
+
     return prompt
 
 def about_tab():
@@ -376,13 +381,24 @@ class InterrogatorPromptRequest(InterrogatorAnalyzeRequest):
         description="The mode used to generate the prompt. Can be one of: best, fast, classic, negative.",
     )
 
+class InterrogatorTerm(BaseModel):
+    name: str
 class InterrogatorCustomRequest(InterrogatorAnalyzeRequest):
     listfile: str = Field(
-        default="list.txt",
+        default="",
         title="List",
-        description="The list of prompts as txt file location",
+        description="The list of terms as txt file location. Absolute path or relative to the automatic folder. Example: list.txt",
     )
-
+    listarray: List[str] = Field(
+        default=["a dog", "a cat"],
+        title="List",
+        description="The list of terms as array. Format: [term1, term2].",
+    )
+    desc: str = Field(
+        default="custom",
+        title="Description",
+        description="The description of the list. Make sure it is unique",
+    )
 
 def mount_interrogator_api(_: gr.Blocks, app: FastAPI):
     @app.get("/interrogator/models")
@@ -428,7 +444,7 @@ def mount_interrogator_api(_: gr.Blocks, app: FastAPI):
             raise HTTPException(status_code=404, detail="Image not found")
 
         img = decode_base64_to_image(image_b64)
-        prompt = image_to_prompt_custom(img, analyzereq.listfile, analyzereq.clip_model_name)
+        prompt = image_to_prompt_custom(img, analyzereq.listfile, analyzereq.listarray, analyzereq.desc, analyzereq.clip_model_name)
         return {"prompt": prompt}
 
 
