@@ -8,7 +8,7 @@ import base64
 from PIL import Image
 
 import clip_interrogator
-from clip_interrogator import Config, Interrogator
+from clip_interrogator import Config, Interrogator, LabelTable, load_list
 
 import modules.generation_parameters_copypaste as parameters_copypaste
 from modules import devices, lowvram, script_callbacks, shared
@@ -141,6 +141,45 @@ def image_to_prompt(image, mode, clip_model_name):
     shared.state.end()
     return prompt
 
+def image_to_prompt_custom(image, listfile, clip_model_name):
+    shared.state.begin()
+    shared.state.job = 'interrogate_custom'
+
+    try:
+        if shared.cmd_opts.lowvram or shared.cmd_opts.medvram:
+            lowvram.send_everything_to_cpu()
+            devices.torch_gc()
+
+        load(clip_model_name)
+        image = image.convert('RGB')
+        prompt = interrogate_custom(image, listfile)
+    except torch.cuda.OutOfMemoryError as e:
+        prompt = "Ran out of VRAM"
+        print(e)
+    except RuntimeError as e:
+        prompt = f"Exception {type(e)}"
+        print(e)
+
+    shared.state.end()
+    return prompt
+
+def interrogate_custom(image, listfile):
+    prompt = ""
+    if listfile is None:
+        return prompt
+
+    if not os.path.exists(listfile):
+        print(f"File {listfile} does not exist")
+        return prompt
+    if not os.path.isfile(listfile):
+        print(f"{listfile} is not a file")
+        return prompt
+
+    table = LabelTable(load_list(listfile), 'terms', ci)
+    best_matches = table.rank(ci.image_to_features(image), top_count=1)
+    prompt = best_matches[0]
+    
+    return prompt
 
 def about_tab():
     gr.Markdown("## 🕵️‍♂️ CLIP Interrogator 🕵️‍♂️")
@@ -337,6 +376,14 @@ class InterrogatorPromptRequest(InterrogatorAnalyzeRequest):
         description="The mode used to generate the prompt. Can be one of: best, fast, classic, negative.",
     )
 
+class InterrogatorCustomRequest(InterrogatorAnalyzeRequest):
+    listfile: str = Field(
+        default="list.txt",
+        title="List",
+        description="The list of prompts as txt file location",
+    )
+
+
 def mount_interrogator_api(_: gr.Blocks, app: FastAPI):
     @app.get("/interrogator/models")
     async def get_models():
@@ -373,6 +420,16 @@ def mount_interrogator_api(_: gr.Blocks, app: FastAPI):
             "trending": trending_ranks,
             "flavor": flavor_ranks,
         }
+    
+    @app.post("/interrogator/custom")
+    async def get_prompt_custom(analyzereq: InterrogatorCustomRequest):
+        image_b64 = analyzereq.image
+        if image_b64 is None:
+            raise HTTPException(status_code=404, detail="Image not found")
+
+        img = decode_base64_to_image(image_b64)
+        prompt = image_to_prompt_custom(img, analyzereq.listfile, analyzereq.clip_model_name)
+        return {"prompt": prompt}
 
 
 script_callbacks.on_app_started(mount_interrogator_api)
