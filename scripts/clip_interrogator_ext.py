@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
 from io import BytesIO
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 ci = None
 low_vram = False
@@ -181,7 +181,8 @@ def image_to_prompt_custom(image, listfile, listarray, desc, clip_model_name):
 
 def interrogate_custom(image, terms, desc="custom"):
     table = LabelTable(terms, desc, ci)
-    best_matches = table.rank(ci.image_to_features(image), top_count=1)
+    image_features = ci.image_to_features(image)
+    best_matches = table.rank(image_features, top_count=1)
     prompt = best_matches[0]
 
     return prompt
@@ -330,6 +331,27 @@ def prompt_tab():
     for tabname, button in buttons.items():
         parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(paste_button=button, tabname=tabname, source_text_component=prompt, source_image_component=image,))
 
+def custom_tab():
+    with gr.Column():
+        with gr.Row():
+            image = gr.Image(type='pil', label="Image")
+            with gr.Column():
+                desc = gr.Textbox(label="Unique description", lines=1, value="mycustomlist")
+                gr.Label(label="Listfile or Listarray")
+                listfile = gr.Textbox(label="Listfile", lines=1, description="Absolute path or relative to the automatic folder. Example: list.txt")
+                listarray = gr.Textbox(label="Listarray", lines=3, value="['hotdog', 'not hotdog']", description="Format: [term1, term2]")
+                clip_model = gr.Dropdown(get_models(), value='ViT-L-14/openai', label='CLIP Model')
+        prompt = gr.Textbox(label="Prompt", lines=2)
+    with gr.Row():
+        button = gr.Button("Generate", variant='primary')
+        unload_button = gr.Button("Unload")
+    with gr.Row():
+        buttons = parameters_copypaste.create_buttons(["txt2img", "img2img", "inpaint", "extras"])
+    button.click(image_to_prompt_custom, inputs=[image, listfile, listarray, desc, clip_model], outputs=prompt)
+    unload_button.click(unload)
+
+    for tabname, button in buttons.items():
+        parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(paste_button=button, tabname=tabname, source_text_component=prompt, source_image_component=image,))
 
 def add_tab():
     global low_vram
@@ -347,6 +369,8 @@ def add_tab():
             analyze_tab()
         with gr.Tab("Batch"):
             batch_tab()
+        with gr.Tab("Custom"):
+            custom_tab()
         with gr.Tab("About"):
             about_tab()
 
@@ -381,8 +405,6 @@ class InterrogatorPromptRequest(InterrogatorAnalyzeRequest):
         description="The mode used to generate the prompt. Can be one of: best, fast, classic, negative.",
     )
 
-class InterrogatorTerm(BaseModel):
-    name: str
 class InterrogatorCustomRequest(InterrogatorAnalyzeRequest):
     listfile: str = Field(
         default="",
