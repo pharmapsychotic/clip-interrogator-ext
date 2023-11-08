@@ -161,6 +161,8 @@ def image_to_prompt_custom(image, listfile, listarray, desc, clip_model_name):
                 terms = load_list(listfile)
                 prompt = interrogate_custom(image, terms, desc)
         elif listarray:
+            if type(listarray) is str:
+                listarray = listarray.split(",")
             if type(listarray) is not list:
                 prompt = f"Listarray is not a list"
                 print(prompt)
@@ -337,9 +339,8 @@ def custom_tab():
             image = gr.Image(type='pil', label="Image")
             with gr.Column():
                 desc = gr.Textbox(label="Unique description", lines=1, value="mycustomlist")
-                gr.Label(label="Listfile or Listarray")
                 listfile = gr.Textbox(label="Listfile", lines=1, description="Absolute path or relative to the automatic folder. Example: list.txt")
-                listarray = gr.Textbox(label="Listarray", lines=3, value="['hotdog', 'not hotdog']", description="Format: [term1, term2]")
+                listarray = gr.Textbox(label="Listarray", lines=3, value="hotdog, not hotdog", description="Format: term1, term2")
                 clip_model = gr.Dropdown(get_models(), value='ViT-L-14/openai', label='CLIP Model')
         prompt = gr.Textbox(label="Prompt", lines=2)
     with gr.Row():
