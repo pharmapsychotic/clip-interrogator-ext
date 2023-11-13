@@ -8,17 +8,18 @@ import base64
 from PIL import Image
 
 import clip_interrogator
-from clip_interrogator import Config, Interrogator
+from clip_interrogator import Config, Interrogator, LabelTable, load_list
 
 import modules.generation_parameters_copypaste as parameters_copypaste
 from modules import devices, lowvram, script_callbacks, shared
 
 from pydantic import BaseModel, Field
+from typing import List
 from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
 from io import BytesIO
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 ci = None
 low_vram = False
@@ -141,6 +142,52 @@ def image_to_prompt(image, mode, clip_model_name):
     shared.state.end()
     return prompt
 
+def image_to_prompt_custom(image, listfile, listarray, desc, clip_model_name):
+    shared.state.begin()
+    shared.state.job = 'interrogate_custom'
+
+    try:
+        if shared.cmd_opts.lowvram or shared.cmd_opts.medvram:
+            lowvram.send_everything_to_cpu()
+            devices.torch_gc()
+
+        load(clip_model_name)
+        image = image.convert('RGB')
+        if listfile:
+            if not os.path.exists(listfile):
+                prompt = f"File {listfile} does not exist"
+                print(prompt)
+            else:
+                terms = load_list(listfile)
+                prompt = interrogate_custom(image, terms, desc)
+        elif listarray:
+            if type(listarray) is str:
+                listarray = listarray.split(",")
+            if type(listarray) is not list:
+                prompt = f"Listarray is not a list"
+                print(prompt)
+            else:
+                prompt = interrogate_custom(image, listarray, desc)
+        else:
+            prompt = f"Listfile or Listarray not defined"
+            print(prompt)
+    except torch.cuda.OutOfMemoryError as e:
+        prompt = "Ran out of VRAM"
+        print(e)
+    except RuntimeError as e:
+        prompt = f"Exception {type(e)}"
+        print(e)
+
+    shared.state.end()
+    return prompt
+
+def interrogate_custom(image, terms, desc="custom"):
+    table = LabelTable(terms, desc, ci)
+    image_features = ci.image_to_features(image)
+    best_matches = table.rank(image_features, top_count=1)
+    prompt = best_matches[0]
+
+    return prompt
 
 def about_tab():
     gr.Markdown("## 🕵️‍♂️ CLIP Interrogator 🕵️‍♂️")
@@ -286,6 +333,26 @@ def prompt_tab():
     for tabname, button in buttons.items():
         parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(paste_button=button, tabname=tabname, source_text_component=prompt, source_image_component=image,))
 
+def custom_tab():
+    with gr.Column():
+        with gr.Row():
+            image = gr.Image(type='pil', label="Image")
+            with gr.Column():
+                desc = gr.Textbox(label="Unique description", lines=1, value="mycustomlist")
+                listfile = gr.Textbox(label="Listfile", lines=1, description="Absolute path or relative to the automatic folder. Example: list.txt")
+                listarray = gr.Textbox(label="Listarray", lines=3, value="hotdog, not hotdog", description="Format: term1, term2")
+                clip_model = gr.Dropdown(get_models(), value='ViT-L-14/openai', label='CLIP Model')
+        prompt = gr.Textbox(label="Prompt", lines=2)
+    with gr.Row():
+        button = gr.Button("Generate", variant='primary')
+        unload_button = gr.Button("Unload")
+    with gr.Row():
+        buttons = parameters_copypaste.create_buttons(["txt2img", "img2img", "inpaint", "extras"])
+    button.click(image_to_prompt_custom, inputs=[image, listfile, listarray, desc, clip_model], outputs=prompt)
+    unload_button.click(unload)
+
+    for tabname, button in buttons.items():
+        parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(paste_button=button, tabname=tabname, source_text_component=prompt, source_image_component=image,))
 
 def add_tab():
     global low_vram
@@ -303,6 +370,8 @@ def add_tab():
             analyze_tab()
         with gr.Tab("Batch"):
             batch_tab()
+        with gr.Tab("Custom"):
+            custom_tab()
         with gr.Tab("About"):
             about_tab()
 
@@ -335,6 +404,23 @@ class InterrogatorPromptRequest(InterrogatorAnalyzeRequest):
         default="fast",
         title="Mode",
         description="The mode used to generate the prompt. Can be one of: best, fast, classic, negative.",
+    )
+
+class InterrogatorCustomRequest(InterrogatorAnalyzeRequest):
+    listfile: str = Field(
+        default="",
+        title="List",
+        description="The list of terms as txt file location. Absolute path or relative to the automatic folder. Example: list.txt",
+    )
+    listarray: List[str] = Field(
+        default=["a dog", "a cat"],
+        title="List",
+        description="The list of terms as array. Format: [term1, term2].",
+    )
+    desc: str = Field(
+        default="custom",
+        title="Description",
+        description="The description of the list. Make sure it is unique",
     )
 
 def mount_interrogator_api(_: gr.Blocks, app: FastAPI):
@@ -373,6 +459,16 @@ def mount_interrogator_api(_: gr.Blocks, app: FastAPI):
             "trending": trending_ranks,
             "flavor": flavor_ranks,
         }
+    
+    @app.post("/interrogator/custom")
+    async def get_prompt_custom(analyzereq: InterrogatorCustomRequest):
+        image_b64 = analyzereq.image
+        if image_b64 is None:
+            raise HTTPException(status_code=404, detail="Image not found")
+
+        img = decode_base64_to_image(image_b64)
+        prompt = image_to_prompt_custom(img, analyzereq.listfile, analyzereq.listarray, analyzereq.desc, analyzereq.clip_model_name)
+        return {"prompt": prompt}
 
 
 script_callbacks.on_app_started(mount_interrogator_api)
