@@ -59,9 +59,9 @@ class BatchWriter:
             print(f"{file} {prompt}")
             filepath = os.path.join(self.folder, file)
             if filepath.lower().endswith(('.png')):
-                self.write_pnginfo(filepath, prompt)
+                self.write_pnginfo(self,filepath, prompt)
             elif filepath.lower().endswith(('.jpg', '.jpeg')):
-                self.write_tags(filepath, prompt)
+                self.write_tags(self,filepath, prompt)
             else:
                 print("unknown file cannot write tags.")
 
