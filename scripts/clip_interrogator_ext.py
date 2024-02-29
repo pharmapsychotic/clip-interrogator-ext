@@ -92,7 +92,11 @@ class BatchWriter:
                         print(f"Other: {key}.  {value}")
                         metadata.add_text(key, value)
             if inferencefound == False:
-                metadata.add_text('Inference',(';'.join(tags)))
+                if ',' in tags:
+                    tag_list = tags.split(', ')
+                    metadata.add_text('Inference',(';'.join(tag_list)))
+                else:
+                    metadata.add_text('Inference',(';'.join(tags)))
                 writefile = True
 
             if writefile == True:
