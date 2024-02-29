@@ -6,6 +6,9 @@ import torch
 import base64
 
 from PIL import Image
+from PIL.ExifTags import TAGS
+import re
+from PIL import PngImagePlugin, Image
 
 import clip_interrogator
 from clip_interrogator import Config, Interrogator
@@ -27,6 +30,7 @@ BATCH_OUTPUT_MODES = [
     'Text file for each image',
     'Single text file with all prompts',
     'csv file with columns for filenames and prompts',
+    'Add tags to image'
 ]
 
 class BatchWriter:
@@ -42,6 +46,7 @@ class BatchWriter:
             self.csv.writerow(['filename', 'prompt'])
 
     def add(self, file, prompt):
+        print(f"add called {self} {file} {prompt} {self.mode}")
         if self.mode == BATCH_OUTPUT_MODES[0]:
             txt_file = os.path.splitext(file)[0] + ".txt"
             with open(os.path.join(self.folder, txt_file), 'w', encoding='utf-8') as f:
@@ -50,11 +55,140 @@ class BatchWriter:
             self.file.write(f"{prompt}\n")
         elif self.mode == BATCH_OUTPUT_MODES[2]:
             self.csv.writerow([file, prompt])
+        elif self.mode == BATCH_OUTPUT_MODES[3]:
+            print(f"{file} {prompt}")
+            filepath = os.path.join(self.folder, file)
+            if filepath.lower().endswith(('.png')):
+                self.write_pnginfo(filepath, prompt)
+            elif filepath.lower().endswith(('.jpg', '.jpeg')):
+                self.write_tags(filepath, prompt)
+            else:
+                print("unknown file cannot write tags.")
 
     def close(self):
         if self.file is not None:
             self.file.close()
 
+    def write_pnginfo(self,filename,tags):
+        if os.path.exists(filename):
+            writefile = False
+            image = Image.open(filename)
+            metadata = PngImagePlugin.PngInfo()
+            inferencefound = False
+            for key, value in image.info.items():
+                if isinstance(key, str) and isinstance(value, str):
+                    if key == 'exif':
+                        print("exif data breaks the file.  Skip {filename}")
+                        continue
+                    elif key == 'parameters':
+                        print(f"Stable Diffusion file. {filename}: {value}")
+                        metadata.add_text(key, value)
+                        sd = True
+                    elif key =='Inference':
+                        print(f"inference text already exists. Overwrite.  {filename}: {value}")
+                        #inferencefound = True
+                        #metadata.add_text(key,value)
+                    else:
+                        print(f"Other: {key}.  {value}")
+                        metadata.add_text(key, value)
+            if inferencefound == False:
+                if ',' in tags:
+                    tag_list = tags.split(', ')
+                    metadata.add_text('Inference',(';'.join(tag_list)))
+                else:
+                    metadata.add_text('Inference',(';'.join(tags)))
+                writefile = True
+
+            if writefile == True:
+                original_mtime = os.path.getmtime(filename)
+                original_atime = os.path.getatime(filename)
+                image.save(filename,format="PNG",pnginfo=metadata)
+                os.utime(filename, (original_atime, original_mtime))
+                print(f"atime and mtime restored.")
+
+    def write_tags(self,filename, tags):
+        # Check if the file exists
+        tags_list = []
+        does_image_have_tags = False
+        if os.path.exists(filename):
+            # Open the image
+
+            original_mtime = os.path.getmtime(filename)
+            original_atime = os.path.getatime(filename)
+
+            image = Image.open(filename)
+
+            # Get the Exif data
+            exifdata = image.getexif()
+
+            # Convert single tag to a list
+            if isinstance(tags, str):
+                tags = [tags]
+
+            #XPKeywords
+            custom_tag = 40094
+
+            # Check if the custom tag is present in the Exif data
+            if custom_tag not in exifdata:
+                # Custom tag doesn't exist, add it with an initial value
+                exifdata[custom_tag] = ''.encode('utf-16')
+                print("image doesn't currently have any tags")
+                current_tags = []
+            else:
+                does_image_have_tags = True
+                print("image currently has tags")
+
+                # Decode the current tags string and remove null characters
+                current_tags = exifdata[custom_tag].decode('utf-16').replace('\x00', '').replace(', ',',').replace(' ,',',')
+
+                # Split the tags into a list
+                current_tags = [current_tags.strip() for current_tags in re.split(r'[;,]', current_tags)]
+                #tags_list = list(set(tag.strip() for tag in re.split(r'[;,]', tags_string_concat)))
+                #tags_list = tags_string_concat.split(',')
+
+                #remove any dupes
+                current_tags = list(set(current_tags))
+                #remove any empty values
+                current_tags = {value for value in current_tags if value}
+
+            if len(current_tags) == 0:
+                print("current_tags is there, but has no tags in")
+
+            # Add the tags if not present
+            if does_image_have_tags:
+                tags_to_add = set(tags) - set(current_tags)
+                tags_list.extend(tags_to_add)
+            else:
+                tags_list.extend(tags)
+            # Check if the tags have changed
+            if does_image_have_tags == True:
+                #remove dupes
+                new_tags_set = set(tags_list)
+                #remove empty/null
+                new_tags_set = {value for value in new_tags_set if value}
+
+            if does_image_have_tags == False or len(tags_list) > 0:
+                if does_image_have_tags == False:
+                    print("no tags originally.  Need to add tags {tags_list}.")
+                else:
+                    print(f"need to add tags {tags_list}.  Current tags are {str(list(current_tags))}")
+
+                #if updated_tags_string != tags_string_concat:
+                # Encode the modified tags string and update the Exif data
+                # Join the modified tags list into a string
+                updated_tags_string = ';'.join(tags_list)
+
+                exifdata[custom_tag] = updated_tags_string.encode('utf-16')
+
+                # Save the image with updated Exif data
+                image.save(filename, exif=exifdata)
+                print(f"Exif tags completed successfully.")
+                os.utime(filename, (original_atime, original_mtime))
+                print(f"atime and mtime restored.")
+            else:
+                print(f"No changes in tags for file {filename}. File not updated.")
+        else:
+            print(f"File not found: {filename}")
 
 def load(clip_model_name):
     global ci
