@@ -151,42 +151,42 @@ class BatchWriter:
                 #remove any empty values
                 current_tags = {value for value in current_tags if value}
 
-                if len(current_tags) == 0:
-                    print("current_tags is there, but has no tags in")
+            if len(current_tags) == 0:
+                print("current_tags is there, but has no tags in")
 
-                # Add the tags if not present
-                if does_image_have_tags:
-                    tags_to_add = set(tags) - set(current_tags)
-                    tags_list.extend(tags_to_add)
+            # Add the tags if not present
+            if does_image_have_tags:
+                tags_to_add = set(tags) - set(current_tags)
+                tags_list.extend(tags_to_add)
+            else:
+                tags_list.extend(tags)
+            # Check if the tags have changed
+            if does_image_have_tags == True:
+                #remove dupes
+                new_tags_set = set(tags_list)
+                #remove empty/null
+                new_tags_set = {value for value in new_tags_set if value}
+
+            if does_image_have_tags == False or len(tags_list) > 0:
+                if does_image_have_tags == False:
+                    print("no tags originally.  Need to add tags {tags_list}.")
                 else:
-                    tags_list.extend(tags)
-                # Check if the tags have changed
-                if does_image_have_tags == True:
-                    #remove dupes
-                    new_tags_set = set(tags_list)
-                    #remove empty/null
-                    new_tags_set = {value for value in new_tags_set if value}
-
-                if does_image_have_tags == False or len(tags_list) > 0:
-                    if does_image_have_tags == False:
-                        print("no tags originally.  Need to add tags {tags_list}.")
-                    else:
-                        print(f"need to add tags {tags_list}.  Current tags are {str(list(current_tags))}")
+                    print(f"need to add tags {tags_list}.  Current tags are {str(list(current_tags))}")
 
                 #if updated_tags_string != tags_string_concat:
-                    # Encode the modified tags string and update the Exif data
-                    # Join the modified tags list into a string
-                    updated_tags_string = ';'.join(tags_list)
+                # Encode the modified tags string and update the Exif data
+                # Join the modified tags list into a string
+                updated_tags_string = ';'.join(tags_list)
 
-                    exifdata[custom_tag] = updated_tags_string.encode('utf-16')
+                exifdata[custom_tag] = updated_tags_string.encode('utf-16')
 
-                    # Save the image with updated Exif data
-                    image.save(filename, exif=exifdata)
-                    print(f"Exif tags completed successfully.")
-                    os.utime(filename, (original_atime, original_mtime))
-                    print(f"atime and mtime restored.")
-                else:
-                    print(f"No changes in tags for file {filename}. File not updated.")
+                # Save the image with updated Exif data
+                image.save(filename, exif=exifdata)
+                print(f"Exif tags completed successfully.")
+                os.utime(filename, (original_atime, original_mtime))
+                print(f"atime and mtime restored.")
+            else:
+                print(f"No changes in tags for file {filename}. File not updated.")
         else:
             print(f"File not found: {filename}")
 
