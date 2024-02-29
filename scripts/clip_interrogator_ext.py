@@ -56,10 +56,10 @@ class BatchWriter:
             self.csv.writerow([file, prompt])
         elif self.mode == BATCH_OUTPUT_MODES[3]:
             print(f"{file} {prompt}")
-            if self.file.lower().endswith(('.png')):
-                self.write_pnginfo(file, prompt)
-            elif self.file.lower().endswith(('.jpg', '.jpeg')):
-                self.write_tags(file, prompt)
+            if file.lower().endswith(('.png')):
+                self.write_pnginfo(self.path.join(self.folder,file), prompt)
+            elif file.lower().endswith(('.jpg', '.jpeg')):
+                self.write_tags(self.path.join(self.folder,file), prompt)
             else:
                 print("unknown file cannot write tags.")
 
