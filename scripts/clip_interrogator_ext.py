@@ -85,9 +85,9 @@ class BatchWriter:
                         metadata.add_text(key, value)
                         sd = True
                     elif key =='Inference':
-                        print(f"inference text already exists. {filename}: {value}")
-                        inferencefound = True
-                        metadata.add_text(key,value)
+                        print(f"inference text already exists. Overwrite.  {filename}: {value}")
+                        #inferencefound = True
+                        #metadata.add_text(key,value)
                     else:
                         print(f"Other: {key}.  {value}")
                         metadata.add_text(key, value)
