@@ -46,6 +46,7 @@ class BatchWriter:
             self.csv.writerow(['filename', 'prompt'])
 
     def add(self, file, prompt):
+        print(f"add called {self} {file} {prompt} {self.mode}")
         if self.mode == BATCH_OUTPUT_MODES[0]:
             txt_file = os.path.splitext(file)[0] + ".txt"
             with open(os.path.join(self.folder, txt_file), 'w', encoding='utf-8') as f:
@@ -68,7 +69,7 @@ class BatchWriter:
         if self.file is not None:
             self.file.close()
 
-    def write_pnginfo(filename,tags):
+    def write_pnginfo(self,filename,tags):
         if os.path.exists(filename):
             writefile = False
             image = Image.open(filename)
@@ -101,7 +102,7 @@ class BatchWriter:
                 os.utime(filename, (original_atime, original_mtime))
                 print(f"atime and mtime restored.")
 
-    def write_tags(filename, tags):
+    def write_tags(self,filename, tags):
         # Check if the file exists
         tags_list = []
         does_image_have_tags = False
