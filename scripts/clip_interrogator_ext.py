@@ -56,10 +56,11 @@ class BatchWriter:
             self.csv.writerow([file, prompt])
         elif self.mode == BATCH_OUTPUT_MODES[3]:
             print(f"{file} {prompt}")
-            if file.lower().endswith(('.png')):
-                write_pnginfo(self.path.join(self.folder,file), prompt)
-            elif file.lower().endswith(('.jpg', '.jpeg')):
-                write_tags(self.path.join(self.folder,file), prompt)
+            filepath = os.path.join(self.folder, file)
+            if filepath.lower().endswith(('.png')):
+                self.write_pnginfo(filepath, prompt)
+            elif filepath.lower().endswith(('.jpg', '.jpeg')):
+                self.write_tags(filepath, prompt)
             else:
                 print("unknown file cannot write tags.")
 
@@ -67,7 +68,7 @@ class BatchWriter:
         if self.file is not None:
             self.file.close()
 
-def write_pnginfo(filename,tags):
+    def write_pnginfo(filename,tags):
         if os.path.exists(filename):
             writefile = False
             image = Image.open(filename)
@@ -100,7 +101,7 @@ def write_pnginfo(filename,tags):
                 os.utime(filename, (original_atime, original_mtime))
                 print(f"atime and mtime restored.")
 
-def write_tags(filename, tags):
+    def write_tags(filename, tags):
         # Check if the file exists
         tags_list = []
         does_image_have_tags = False
