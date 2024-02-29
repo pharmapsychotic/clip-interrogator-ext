@@ -30,7 +30,7 @@ BATCH_OUTPUT_MODES = [
     'Text file for each image',
     'Single text file with all prompts',
     'csv file with columns for filenames and prompts',
-    'write as exiftags to image'
+    'Add tags to image'
 ]
 
 class BatchWriter:
