@@ -8,6 +8,7 @@ import base64
 from PIL import Image
 from PIL.ExifTags import TAGS
 import re
+from PIL import PngImagePlugin, Image
 
 import clip_interrogator
 from clip_interrogator import Config, Interrogator
@@ -54,13 +55,51 @@ class BatchWriter:
         elif self.mode == BATCH_OUTPUT_MODES[2]:
             self.csv.writerow([file, prompt])
         elif self.mode == BATCH_OUTPUT_MODES[3]:
-            self.write_tags(file, prompt)
+            if self.filename.lower().endswith(('.png')):
+                self.write_pnginfo(file, prompt)
+            elif self.filename.lower().endswith(('.jpg', '.jpeg')):
+                self.write_tags(file, prompt)
+            else:
+                print("unknown file cannot write tags.")
 
     def close(self):
         if self.file is not None:
             self.file.close()
 
-    def modify_exif_tags(filename, tags):
+    def write_pnginfo(filename,tags):
+        if os.path.exists(filename):
+            writefile = False
+            image = Image.open(filename)
+            metadata = PngImagePlugin.PngInfo()
+            inferencefound = False
+            for key, value in image.info.items():
+                if isinstance(key, str) and isinstance(value, str):
+                    if key == 'exif':
+                        print("exif data breaks the file.  Skip {filename}")
+                        continue
+                    elif key == 'parameters':
+                        print(f"Stable Diffusion file. {filename}: {value}")
+                        metadata.add_text(key, value)
+                        sd = True
+                    elif key =='Inference':
+                        print(f"inference text already exists. {filename}: {value}")
+                        inferencefound = True
+                        metadata.add_text(key,value)
+                    else:
+                        print(f"Other: {key}.  {value}")
+                        metadata.add_text(key, value)
+            if inferencefound == False:
+                metadata.add_text('Inference',(';'.join(tags)))
+                writefile = True
+
+            if writefile == True:
+                original_mtime = os.path.getmtime(filename)
+                original_atime = os.path.getatime(filename)
+                image.save(filename,format="PNG",pnginfo=metadata)
+                os.utime(filename, (original_atime, original_mtime))
+                print(f"atime and mtime restored.")
+
+    def write_tags(filename, tags):
         # Check if the file exists
         tags_list = []
         does_image_have_tags = False
