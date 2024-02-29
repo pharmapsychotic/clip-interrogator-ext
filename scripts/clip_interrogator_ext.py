@@ -55,6 +55,7 @@ class BatchWriter:
         elif self.mode == BATCH_OUTPUT_MODES[2]:
             self.csv.writerow([file, prompt])
         elif self.mode == BATCH_OUTPUT_MODES[3]:
+            print(f"{file} {prompt}")
             if self.file.lower().endswith(('.png')):
                 self.write_pnginfo(file, prompt)
             elif self.file.lower().endswith(('.jpg', '.jpeg')):
